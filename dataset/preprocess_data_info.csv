@@ -1,0 +1,8 @@
+,dataset name,start time,length 1 sessions filtered,max date,amex split days before maxdate,len training sessions (tra_sess),len test sessions (tes_sess),item count:,len training seqs (tr_seqs),len test seqs (te_seqs),avg length
+0,amex_explorepoi-poi_category,2022-10-18 13:38:40.496356,87,1654055911.0,6,644,71,556,3536,3536,6.4405099150141645
+,dataset name,start time,length 1 sessions filtered,max date,amex split days before maxdate,len training sessions (tra_sess),len test sessions (tes_sess),item count:,len training seqs (tr_seqs),len test seqs (te_seqs),avg length
+0,amex_explorepoi-category,2022-10-18 13:42:06.388167,114,1654055911.0,6,1224,153,4,10138,10138,9.466957153231663
+,dataset name,start time,length 1 sessions filtered,max date,amex split days before maxdate,len training sessions (tra_sess),len test sessions (tes_sess),item count:,len training seqs (tr_seqs),len test seqs (te_seqs),avg length
+0,amex_explorepoi-poi_context,2022-10-18 13:42:33.430130,114,1654055911.0,6,632,71,535,3419,3419,6.36599423631124
+,dataset name,start time,length 1 sessions filtered,max date,amex split days before maxdate,len training sessions (tra_sess),len test sessions (tes_sess),item count:,len training seqs (tr_seqs),len test seqs (te_seqs),avg length
+0,amex_explorepoi-context,2022-10-18 13:42:52.286242,114,1654055911.0,6,1170,148,183,9998,9998,9.692015209125476
