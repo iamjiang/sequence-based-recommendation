@@ -1,0 +1,2 @@
+pytorch=1.10.0=py3.8_cuda11.3_cudnn8.2.0_0
+numba==0.54.1
