@@ -46,8 +46,9 @@ def validate(valid_loader, model,device):
         for step, batch in tqdm(enumerate(valid_loader), total=len(valid_loader),position=0,leave=True):
             inputs, labels = prepare_batch(batch, device)
             outputs = model(*inputs)
-            # loss = criterion(outputs, labels)
-            loss = nn.functional.nll_loss(outputs, labels)
+            criterion = nn.CrossEntropyLoss()
+            loss = criterion(outputs, labels)
+            # loss = nn.functional.nll_loss(outputs, labels)
             logits = F.softmax(outputs, dim = 1)
             recall, mrr = metric.evaluate(logits, labels, k = args.topk)
             recalls.append(recall)
@@ -73,11 +74,36 @@ def fix_weight_decay(model):
     params = [{'params': decay}, {'params': no_decay, 'weight_decay': 0}]
     return params
 
+def split_validation(train_data, valid_portion):
+    train_x, train_y = train_data
+    n_samples = len(train_x)
+    sidx = np.arange(n_samples, dtype='int32')
+    np.random.seed(101)
+    np.random.shuffle(sidx)
+    n_train = int(np.round(n_samples * (1. - valid_portion)))
+    valid_x = [train_x[s] for s in sidx[n_train:]]
+    valid_y = [train_y[s] for s in sidx[n_train:]]
+    train_x = [train_x[s] for s in sidx[:n_train]]
+    train_y = [train_y[s] for s in sidx[:n_train]]  
+    
+    train_set=(train_x, train_y)
+    valid_set=(valid_x, valid_y)
+    
+    return train_set, valid_set
 
 def main(args,device):
-    train, valid, test = load_data(args.dataset_dir, valid_portion=args.valid_split)
+    
+    if not os.path.exists(os.path.join(os.getcwd(),"long_seq")):
+        os.makedirs("long_seq")
+    if not os.path.exists(os.path.join(os.getcwd(),"short_seq")):
+        os.makedirs("short_seq")
+        
+    train, test = load_data(args.dataset_dir, sequence_type=args.sequence_type)
+    if args.validation:
+        train,valid=split_validation(train, args.valid_split)
+        test=valid
+    
     train_data = RecSysDataset(train)
-    valid_data = RecSysDataset(valid)
     test_data = RecSysDataset(test)
 
     collate_fn = collate_fn_factory(seq_to_session_graph)
@@ -85,7 +111,7 @@ def main(args,device):
     train_loader = DataLoader(
         train_data,
         batch_size=args.batch_size,
-        # shuffle=True,
+        # shuffle=True,  # Remove shuffle=True in this case as SubsetRandomSampler shuffles data already
         # drop_last=True,
         num_workers=args.num_workers,
         collate_fn=collate_fn,
@@ -93,16 +119,6 @@ def main(args,device):
         sampler=SequentialSampler(train_data)
     )
 
-    valid_loader = DataLoader(
-        valid_data,
-        batch_size=args.batch_size,
-        # shuffle=True,
-        # drop_last=True,
-        num_workers=args.num_workers,
-        collate_fn=collate_fn,
-        pin_memory=True,
-        sampler=SequentialSampler(valid_data)
-    )
 
     test_loader = DataLoader(
         test_data,
@@ -113,9 +129,7 @@ def main(args,device):
     )
     print()
     print('{:<30}{:<10,} '.format("training mini-batch",len(train_loader)))
-    print('{:<30}{:<10,} '.format("validation mini-batch",len(valid_loader)))
     print('{:<30}{:<10,} '.format("test mini-batch",len(test_loader)))
-    
     
     model = SRGNN(args.n_items, args.embedding_dim, args.num_layers, feat_drop=args.feat_drop)
     model = model.to(device)
@@ -127,23 +141,27 @@ def main(args,device):
     else:
         params = model.parameters()
 
-    optimizer = optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
-    # criterion = nn.CrossEntropyLoss()
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=3, gamma=0.1)
-
-    best_metric = float('inf') ## if cross-entropy loss is selected
+    optimizer = optim.Adam(params, args.lr, weight_decay=args.weight_decay)
+    criterion = nn.CrossEntropyLoss()
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_dc_step, gamma=args.lr_dc)
+    
+    
+    best_result = [0, 0]
+    best_epoch = [0, 0]
+    bad_counter = 0
+    
+    # best_metric = float('inf') ## if cross-entropy loss is selected
+    best_mrr = float(0) 
+    best_recall = float(0)
 
     TRAIN_LOSS=[]
-    VALID_LOSS=[]
     TEST_LOSS=[]
 
-    TRAIN_MRR=[]
-    VALID_MRR=[]
-    TEST_MRR=[]
-
     TRAIN_RECALL=[]
-    VALID_RECALL=[]
     TEST_RECALL=[]
+    
+    TRAIN_MRR=[]
+    TEST_MRR=[]
     
     for epoch in tqdm(range(args.epochs)): #before: no leave param, now , leave=False
 
@@ -157,10 +175,16 @@ def main(args,device):
 
             optimizer.zero_grad()
             logits = model(*inputs)
-            # loss = criterion(logits, labels)
-            loss = nn.functional.nll_loss(logits, labels)
+            loss = criterion(logits, labels)
+            # loss = nn.functional.nll_loss(logits, labels)
+
             loss.backward()
-            optimizer.step()  
+            if args.gradient_accumulation:
+                if (step+1)%args.accumulation_steps == 0 or step==len(train_loader):
+                    optimizer.step()
+            else:
+                optimizer.step()
+ 
             loss_val = loss.item()
             sum_epoch_loss += loss_val
 
@@ -169,9 +193,21 @@ def main(args,device):
 #                       .format(epoch, sum_epoch_loss / (step + 1), labels.shape[0] / (time.time() - start)))
 
 #             start = time.time()
-
-        if not os.path.exists(os.path.join(os.getcwd(),"output_metrics")):
-            os.makedirs("output_metrics")
+        
+        if args.sequence_type=="all":
+            root_dir=os.path.join(os.getcwd(),"output_metrics")
+            if not os.path.exists(root_dir):
+                os.makedirs(root_dir)
+        elif args.sequence_type=="long":
+            root_dir=os.path.join(os.getcwd(),"long_seq","output_metrics")
+            if not os.path.exists(root_dir):
+                os.makedirs(root_dir)
+        elif args.sequence_type=="short":
+            root_dir=os.path.join(os.getcwd(),"short_seq","output_metrics")
+            if not os.path.exists(root_dir):
+                os.makedirs(root_dir)
+        else:
+            raise ValueError("unknown sequence type")
         
         train_recall, train_mrr, train_loss = validate(train_loader, model, device)
         TRAIN_LOSS.append(train_loss)
@@ -181,29 +217,32 @@ def main(args,device):
         print('Epoch {} training--loss: {:.4f}, Recall@{}: {:.4f}, MRR@{}: {:.4f} \n'\
               .format(epoch, train_loss,args.topk, train_recall, args.topk, train_mrr))
 
-        dataset_name = args.dataset_dir.split('/')[-2]
-        with open(os.path.join(os.getcwd(),"output_metrics",dataset_name+"_train_metrics.txt"),'a') as f:
-            f.write(f'{epoch+1},{train_loss},{train_recall},{train_mrr}\n')        
-        
-        valid_recall, valid_mrr, valid_loss = validate(valid_loader, model, device)
-        VALID_LOSS.append(valid_loss)
-        VALID_MRR.append(valid_mrr)
-        VALID_RECALL.append(valid_recall)
-        print('Epoch {} validation--loss: {:.4f}, Recall@{}: {:.4f}, MRR@{}: {:.4f} \n'\
-              .format(epoch, valid_loss,args.topk, valid_recall, args.topk, valid_mrr))
-        
-        with open(os.path.join(os.getcwd(),"output_metrics",dataset_name+"_valid_metrics.txt"),'a') as f:
-            f.write(f'{epoch+1},{valid_loss},{valid_recall},{valid_mrr}\n')
-        
+        # with open(os.path.join(os.getcwd(),"output_metrics","train_"+args.output_name),'a') as f:
+        #     f.write(f'{epoch+1},{train_recall},{train_mrr}\n')
+                  
         test_recall, test_mrr, test_loss = validate(test_loader, model, device)
         TEST_LOSS.append(test_loss)
         TEST_MRR.append(test_mrr)
         TEST_RECALL.append(test_recall)
         print('Epoch {} test--loss: {:.4f}, Recall@{}: {:.4f}, MRR@{}: {:.4f} \n'\
               .format(epoch, test_loss,args.topk, test_recall, args.topk, test_mrr))
-
-        with open(os.path.join(os.getcwd(),"output_metrics",dataset_name+"_test_metrics.txt"),'a') as f:
-            f.write(f'{epoch+1},{test_loss},{test_recall},{test_mrr}\n')
+        
+        if args.sequence_type=="all":
+            root_dir=os.path.join(os.getcwd(),"output_metrics")
+            with open(os.path.join(root_dir,"test_"+args.output_name),'a') as f:
+                f.write(f'{epoch+1},{test_recall},{test_mrr}\n')
+            
+        elif args.sequence_type=="long":
+            root_dir=os.path.join(os.getcwd(),"long_seq","output_metrics")
+            with open(os.path.join(root_dir,"test_"+args.output_name),'a') as f:
+                f.write(f'{epoch+1},{test_recall},{test_mrr}\n')
+                
+        elif args.sequence_type=="short":
+            root_dir=os.path.join(os.getcwd(),"short_seq","output_metrics")
+            with open(os.path.join(root_dir,"test_"+args.output_name),'a') as f:
+                f.write(f'{epoch+1},{test_recall},{test_mrr}\n')
+        else:
+            raise ValueError("unknown sequence type")
 
         # store best loss and save a model checkpoint
         ckpt_dict = {
@@ -211,12 +250,35 @@ def main(args,device):
             'state_dict': model.state_dict(),
             'optimizer': optimizer.state_dict()
         }
-
-        selected_metric=valid_loss
-        if selected_metric<best_metric:
-            best_metric=selected_metric
-            dataset_name = args.dataset_dir.split('/')[-2] 
-            torch.save(ckpt_dict, dataset_name + '_' + 'latest_checkpoint.pth')
+        
+        if test_recall>best_recall or test_mrr>best_mrr:
+            best_recall=test_recall
+            best_mrr=test_mrr
+            if args.sequence_type=="all":
+                torch.save(ckpt_dict, args.model_checkpoint)
+            elif args.sequence_type=="long":
+                save_dir=os.path.join(os.getcwd(),"long_seq")
+                torch.save(ckpt_dict, os.path.join(save_dir,args.model_checkpoint))
+            elif args.sequence_type=="short":
+                save_dir=os.path.join(os.getcwd(),"short_seq")
+                torch.save(ckpt_dict, os.path.join(save_dir,args.model_checkpoint))                
+            else:
+                raise ValueError("unknown sequence type")            
+                
+        flag = 0
+        if round(test_recall,2) > round(best_result[0],2):
+            best_result[0] = test_recall
+            best_epoch[0] = epoch
+            flag = 1
+        if round(test_mrr,2) > round(best_result[1],2):
+            best_result[1] = test_mrr
+            best_epoch[1] = epoch
+            flag = 1
+        print('Best Result:')
+        print('\tRecall@20:\t%.4f\tMMR@20:\t%.4f\tEpoch:\t%d,\t%d'% (best_result[0], best_result[1], best_epoch[0], best_epoch[1]))
+        bad_counter += 1 - flag
+        if bad_counter >= args.patience:
+            break
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -226,50 +288,30 @@ if __name__ == '__main__':
     parser.add_argument("--seed",  type=int,default=101,
             help="random seed for np.random.seed, torch.manual_seed and torch.cuda.manual_seed.")
     parser.add_argument('--n_items', type=int, default=37484, help='number of unique items. 37484 for yoochoose')
-    parser.add_argument('--embedding-dim', type=int, default=256, help='the embedding size')
+    parser.add_argument('--embedding-dim', type=int, default=128, help='the embedding size')
     parser.add_argument('--num-layers', type=int, default=1, help='the number of layers')
     parser.add_argument('--feat-drop', type=float, default=0.1, help='the dropout ratio for features')
     parser.add_argument('--lr', type=float, default=1e-3, help='the learning rate')
-    parser.add_argument(
-        '--batch-size', type=int, default=512, help='the batch size for training'
-    )
-    parser.add_argument(
-        '--epochs', type=int, default=30, help='the number of training epochs'
-    )
-    parser.add_argument(
-        '--weight-decay',
-        type=float,
-        default=1e-4,
-        help='the parameter for L2 regularization',
-    )
-
-    parser.add_argument(
-        '--valid-split',
-        type=float,
-        default=0.1,
-        help='the fraction for the validation set',
-    )
-
-    parser.add_argument(
-        '--topk', 
-        type=int, 
-        default=20, 
-        help='number of top score items selected for calculating recall and mrr metrics',
-    )
-
-    parser.add_argument(
-        '--log_aggr', 
-        type=int, 
-        default=1, 
-        help='print the loss after this number of iterations',
-    )
-    parser.add_argument(
-        '--num-workers',
-        type=int,
-        default=0,
-        help='the number of processes to load the input graphs',
-    )
-
+    parser.add_argument('--lr_dc', type=float, default=0.1, help='learning rate decay rate')
+    parser.add_argument('--lr_dc_step', type=int, default=3, help='the number of steps after which the learning rate decay')
+    parser.add_argument('--l2', type=float, default=1e-5, help='l2 penalty')  # [0.001, 0.0005, 0.0001, 0.00005, 0.00001]
+    parser.add_argument("--gradient_accumulation",action='store_true', help='gradient accumulation or not')
+    parser.add_argument("--accumulation_steps",type=int,default=2,
+                               help="Number of updates steps to accumulate before performing a backward/update pass.")
+    
+    parser.add_argument('--step', type=int, default=1, help='gnn propogation steps')
+    parser.add_argument('--patience', type=int, default=5, help='the number of epoch to wait before early stop ')
+    parser.add_argument('--batch-size', type=int, default=100, help='the batch size for training')
+    parser.add_argument('--epochs', type=int, default=30, help='the number of training epochs')
+    parser.add_argument("--output_name", type=str, default="amex_metrics.txt")
+    parser.add_argument("--model_checkpoint", type=str, default="amex_checkpoint.pth")    
+    parser.add_argument('--weight-decay',type=float,default=1e-5,help='the parameter for L2 regularization')
+    parser.add_argument('--validation', action='store_true', help='validation')
+    parser.add_argument('--valid-split',type=float,default=0.1,help='the fraction for the validation set')
+    parser.add_argument('--topk', type=int, default=20, help='number of top score items selected for calculating recall and mrr metrics')
+    parser.add_argument('--log_aggr', type=int, default=1, help='print the loss after this number of iterations')
+    parser.add_argument('--num-workers',type=int,default=0,help='the number of processes to load the input graphs')
+    parser.add_argument('--sequence_type',type=str,default="all",help='all sequence or longer only sequence(>5) or short only sequence(<=5)')
 
     args= parser.parse_args()
     print(args)
