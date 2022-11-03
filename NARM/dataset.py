@@ -1,46 +1,46 @@
-# -*- coding: utf-8 -*-
-"""
-create on 18 Sep, 2019
-
-@author: wangshuo
-
-Reference: https://github.com/lijingsdu/sessionRec_NARM/blob/master/data_process.py
-"""
-
+import os
 import pickle
 import torch
 from torch.utils.data import Dataset
 import numpy as np
 
-
-def load_data(root, valid_portion=0.1, maxlen=19, sort_by_len=False):
+def load_data(root, sequence_type="all",maxlen=None, sort_by_len=False):
     '''Loads the dataset
-
-    :type path: String
-    :param path: The path to the dataset (here RSC2015)
-    :type n_items: int
-    :param n_items: The number of items.
-    :type valid_portion: float
-    :param valid_portion: The proportion of the full train set used for
-        the validation set.
-    :type maxlen: None or positive int
-    :param maxlen: the max sequence length we use in the train/valid set.
-    :type sort_by_len: bool
-    :name sort_by_len: Sort by the sequence lenght for the train,
+    :root: The path to the dataset 
+    :sequence_type(type:str): all sequence or longer only sequence(>5) or short only sequence(<=5) 
+    :maxlen(type: None or positive int): the max sequence length we use in the train/valid set.
+    :sort_by_len(type : bool): Sort by the sequence lenght for the train,
         valid and test set. This allow faster execution as it cause
         less padding per minibatch. Another mechanism must be used to
         shuffle the train set at each epoch.
-
     '''
     
     # Load the dataset
-    path_train_data = root + 'train.txt'
-    path_test_data = root + 'test.txt'
-    with open(path_train_data, 'rb') as f1:
-        train_set = pickle.load(f1)
-
-    with open(path_test_data, 'rb') as f2:
-        test_set = pickle.load(f2)
+    if sequence_type=="all":
+        train_path_data=os.path.join(root,"train.txt")
+        test_path_data=os.path.join(root,"test.txt")
+        with open(train_path_data, 'rb') as f1:
+            train_set = pickle.load(f1)
+        with open(test_path_data, 'rb') as f2:
+            test_set = pickle.load(f2)
+    elif sequence_type=="long":
+        data_dir=os.path.join(root,"long_short_seq")
+        train_path_data=os.path.join(data_dir,"long_train.txt")
+        test_path_data=os.path.join(data_dir,"long_test.txt")
+        with open(train_path_data, 'rb') as f1:
+            train_set = pickle.load(f1)
+        with open(test_path_data, 'rb') as f2:
+            test_set = pickle.load(f2)
+    elif sequence_type=="short":
+        data_dir=os.path.join(root,"long_short_seq")
+        train_path_data=os.path.join(data_dir,"short_train.txt")
+        test_path_data=os.path.join(data_dir,"short_test.txt")
+        with open(train_path_data, 'rb') as f1:
+            train_set = pickle.load(f1)
+        with open(test_path_data, 'rb') as f2:
+            test_set = pickle.load(f2)        
+    else:
+        raise ValueError("unknown sequence type")
 
     
     if maxlen:
@@ -68,41 +68,47 @@ def load_data(root, valid_portion=0.1, maxlen=19, sort_by_len=False):
         test_set = (new_test_set_x, new_test_set_y)
         del new_test_set_x, new_test_set_y
 
-    # split training set into validation set
-    train_set_x, train_set_y = train_set
-    n_samples = len(train_set_x)
-    sidx = np.arange(n_samples, dtype='int32')
-    np.random.shuffle(sidx)
-    n_train = int(np.round(n_samples * (1. - valid_portion)))
-    valid_set_x = [train_set_x[s] for s in sidx[n_train:]]
-    valid_set_y = [train_set_y[s] for s in sidx[n_train:]]
-    train_set_x = [train_set_x[s] for s in sidx[:n_train]]
-    train_set_y = [train_set_y[s] for s in sidx[:n_train]]
+#     ### split training set into validation set and shuffle them
+#     train_set_x, train_set_y = train_set
+    
+#     n_samples = len(train_set_x)
+#     sidx = np.arange(n_samples, dtype='int32')
+#     np.random.seed(101)
+#     np.random.shuffle(sidx)
+#     n_train = int(np.round(n_samples * (1. - valid_portion)))
+#     valid_set_x = [train_set_x[s] for s in sidx[n_train:]]
+#     valid_set_y = [train_set_y[s] for s in sidx[n_train:]]
+#     train_set_x = [train_set_x[s] for s in sidx[:n_train]]
+#     train_set_y = [train_set_y[s] for s in sidx[:n_train]]
 
-    (test_set_x, test_set_y) = test_set
+#     ### shuffle test set
+#     (test_set_x, test_set_y) = test_set
+#     n_samples_test = len(test_set_x)
+#     sidx_test = np.arange(n_samples_test, dtype='int32')
+#     np.random.seed(102)
+#     np.random.shuffle(sidx_test)
+#     test_set_x = [test_set_x[s] for s in sidx_test]
+#     test_set_y = [test_set_y[s] for s in sidx_test]
 
     def len_argsort(seq):
         return sorted(range(len(seq)), key=lambda x: len(seq[x]))
 
+    train_set_x, train_set_y = train_set
+    test_set_x, test_set_y = test_set
+    
     if sort_by_len:
         sorted_index = len_argsort(test_set_x)
         test_set_x = [test_set_x[i] for i in sorted_index]
         test_set_y = [test_set_y[i] for i in sorted_index]
-
-        sorted_index = len_argsort(valid_set_x)
-        valid_set_x = [valid_set_x[i] for i in sorted_index]
-        valid_set_y = [valid_set_y[i] for i in sorted_index]
+ 
+        sorted_index = len_argsort(train_set_x)
+        train_set_x = [train_set_x[i] for i in sorted_index]
+        train_set_y = [train_set_y[i] for i in sorted_index]
 
     train = (train_set_x, train_set_y)
-    valid = (valid_set_x, valid_set_y)
     test = (test_set_x, test_set_y)
     
-#     from sklearn.preprocessing import LabelEncoder
-#     label_encoder = preprocessing.LabelEncoder()
-#     for input_set in [train_set_x, train_set_y, valid_set_x, valid_set_y, ]
-#     label_encoder.fit_transform(train_set_x)
-    
-    return train, valid, test
+    return train, test
 
 
 class RecSysDataset(Dataset):
@@ -127,3 +133,4 @@ class RecSysDataset(Dataset):
 
     def __len__(self):
         return len(self.data[0])
+    

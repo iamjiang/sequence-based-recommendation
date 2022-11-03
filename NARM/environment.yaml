@@ -1,4 +1,4 @@
-name: lessr
+name: NARM
 channels:
     - pytorch
     - dglteam
@@ -26,9 +26,5 @@ dependencies:
         - sklearn==0.0
         - tqdm==4.64.1
         - wandb==0.13.4
-        - ipykernel
         - matplotlib==3.6.0
         - seaborn==0.12.1
-        - Jinja2==3.1.2
-        
-        

@@ -443,6 +443,7 @@ elif args.dataset in amex_sets:
     pickle.dump(tra, open(args.dataset + '/train.txt', 'wb'))
     pickle.dump(tes, open(args.dataset + '/test.txt', 'wb'))
     pickle.dump(tra_seqs, open(args.dataset + '/all_train_seq.txt', 'wb'))
+    pickle.dump(tes_seqs, open(args.dataset + '/all_test_seq.txt', 'wb'))
     
 elif args.dataset == 'amex_explorepoi-poi_category':
     if not os.path.exists('amex_explorepoi-poi_category'):
@@ -450,30 +451,39 @@ elif args.dataset == 'amex_explorepoi-poi_category':
     pickle.dump(tra, open('amex_explorepoi-poi_category/train.txt', 'wb'))
     pickle.dump(tes, open('amex_explorepoi-poi_category/test.txt', 'wb'))
     pickle.dump(tra_seqs, open('amex_explorepoi-poi_category/all_train_seq.txt', 'wb'))
+    pickle.dump(tes_seqs, open('amex_explorepoi-poi_category/all_test_seq.txt', 'wb'))
+    
 elif args.dataset == 'amex_explorepoi-poi_context':
     if not os.path.exists('amex_explorepoi-poi_context'):
         os.makedirs('amex_explorepoi-poi_context')
     pickle.dump(tra, open('amex_explorepoi-poi_context/train.txt', 'wb'))
     pickle.dump(tes, open('amex_explorepoi-poi_context/test.txt', 'wb'))
     pickle.dump(tra_seqs, open('amex_explorepoi-poi_context/all_train_seq.txt', 'wb'))
+    pickle.dump(tes_seqs, open('amex_explorepoi-poi_context/all_test_seq.txt', 'wb'))
+    
 elif args.dataset == 'amex_explorepoi-poi':
     if not os.path.exists('amex_explorepoi-poi'):
         os.makedirs('amex_explorepoi-poi')
     pickle.dump(tra, open('amex_explorepoi-poi/train.txt', 'wb'))
     pickle.dump(tes, open('amex_explorepoi-poi/test.txt', 'wb'))
     pickle.dump(tra_seqs, open('amex_explorepoi-poi/all_train_seq.txt', 'wb'))
+    pickle.dump(tes_seqs, open('amex_explorepoi-poi/all_test_seq.txt', 'wb'))
+    
 elif args.dataset == 'amex_explorepoi-category':
     if not os.path.exists('amex_explorepoi-category'):
         os.makedirs('amex_explorepoi-category')
     pickle.dump(tra, open('amex_explorepoi-category/train.txt', 'wb'))
     pickle.dump(tes, open('amex_explorepoi-category/test.txt', 'wb'))
     pickle.dump(tra_seqs, open('amex_explorepoi-category/all_train_seq.txt', 'wb'))
+    pickle.dump(tes_seqs, open('amex_explorepoi-category/all_test_seq.txt', 'wb'))
+    
 elif args.dataset == 'amex_explorepoi-context':
     if not os.path.exists('amex_explorepoi-context'):
         os.makedirs('amex_explorepoi-context')
     pickle.dump(tra, open('amex_explorepoi-context/train.txt', 'wb'))
     pickle.dump(tes, open('amex_explorepoi-context/test.txt', 'wb'))
     pickle.dump(tra_seqs, open('amex_explorepoi-context/all_train_seq.txt', 'wb'))
+    pickle.dump(tes_seqs, open('amex_explorepoi-context/all_test_seq.txt', 'wb'))
     
 elif args.dataset == 'amex_log-poi':
     if not os.path.exists('amex_log-poi'):
@@ -481,18 +491,23 @@ elif args.dataset == 'amex_log-poi':
     pickle.dump(tra, open('amex_log-poi/train.txt', 'wb'))
     pickle.dump(tes, open('amex_log-poi/test.txt', 'wb'))
     pickle.dump(tra_seqs, open('amex_log-poi/all_train_seq.txt', 'wb'))
+    pickle.dump(tes_seqs, open('amex_log-poi/all_test_seq.txt', 'wb'))
+    
 elif args.dataset == 'amex_log-category':
     if not os.path.exists('amex_log-category'):
         os.makedirs('amex_log-category')
     pickle.dump(tra, open('amex_log-category/train.txt', 'wb'))
     pickle.dump(tes, open('amex_log-category/test.txt', 'wb'))
     pickle.dump(tra_seqs, open('amex_log-category/all_train_seq.txt', 'wb'))
+    pickle.dump(test_seqs, open('amex_log-category/all_test_seq.txt', 'wb'))
+    
 elif args.dataset == 'amex_log-context':
     if not os.path.exists('amex_log-context'):
         os.makedirs('amex_log-context')
     pickle.dump(tra, open('amex_log-context/train.txt', 'wb'))
     pickle.dump(tes, open('amex_log-context/test.txt', 'wb'))
     pickle.dump(tra_seqs, open('amex_log-context/all_train_seq.txt', 'wb'))
+    pickle.dump(tes_seqs, open('amex_log-context/all_test_seq.txt', 'wb'))
     
 else:
     print('dataset not created, invalid entered')

@@ -3,18 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-# from torchnlp.encoders import LabelEncoder
-
 class NARM(nn.Module):
     """Neural Attentive Session Based Recommendation Model Class
-
     Args:
         n_items(int): the number of items
         hidden_size(int): the hidden size of gru
         embedding_dim(int): the dimension of item embedding
         batch_size(int): 
         n_layers(int): the number of gru layers
-
     """
     def __init__(self, n_items, hidden_size, embedding_dim, batch_size, n_layers = 1):
         super(NARM, self).__init__()
@@ -67,4 +63,6 @@ class NARM(nn.Module):
 
     def init_hidden(self, batch_size):
         return torch.zeros((self.n_layers, batch_size, self.hidden_size), requires_grad=True).to(self.device)
-        
+    
+
+

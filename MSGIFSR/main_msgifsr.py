@@ -13,8 +13,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, SequentialSampler
 
-from lessr import LESSR
-from collate import (collate_fn_factory, seq_to_eop_multigraph,seq_to_shortcut_graph)
+from msgifsr import MSGIFSR
+from collate import (collate_fn_factory_ccs, seq_to_ccs_graph)
 import metric
 from dataset import load_data,RecSysDataset
 import warnings 
@@ -106,10 +106,7 @@ def main(args,device):
     train_data = RecSysDataset(train)
     test_data = RecSysDataset(test)
 
-    if args.num_layers > 1:
-        collate_fn = collate_fn_factory(seq_to_eop_multigraph, seq_to_shortcut_graph)
-    else:
-        collate_fn = collate_fn_factory(seq_to_eop_multigraph)
+    collate_fn = collate_fn_factory_ccs((seq_to_ccs_graph,), order=args.order)
 
     train_loader = DataLoader(
         train_data,
@@ -128,13 +125,16 @@ def main(args,device):
         batch_size=args.batch_size,
         # shuffle=True,
         num_workers=args.num_workers,
-        collate_fn=collate_fn
+        collate_fn=collate_fn,
+        pin_memory=True
     )
     print()
     print('{:<30}{:<10,} '.format("training mini-batch",len(train_loader)))
     print('{:<30}{:<10,} '.format("test mini-batch",len(test_loader)))
     
-    model = LESSR(args.n_items, args.embedding_dim, args.num_layers, feat_drop=args.feat_drop)
+    model = MSGIFSR(args.n_items, args.embedding_dim, args.num_layers, dropout=args.feat_drop, reducer=args.reducer, order=args.order, 
+                    norm=args.norm, extra=args.extra, fusion=args.fusion, device=device)
+
     model = model.to(device)
     print()
     print("{:<30}{:<20,}".format("Number of parameters",np.sum([p.nelement() for p in model.parameters()])))
@@ -314,6 +314,11 @@ if __name__ == '__main__':
     parser.add_argument('--topk', type=int, default=20, help='number of top score items selected for calculating recall and mrr metrics')
     parser.add_argument('--log_aggr', type=int, default=1, help='print the loss after this number of iterations')
     parser.add_argument('--num-workers',type=int,default=0,help='the number of processes to load the input graphs')
+    parser.add_argument('--order',type=int,default=3,help='order of msg',)
+    parser.add_argument('--reducer',type=str,default='mean',help='method for reducer')
+    parser.add_argument('--norm', type=bool,default=True,help='whether use l2 norm')
+    parser.add_argument('--extra',action='store_true',help='whether use REnorm.')
+    parser.add_argument('--fusion',action='store_true',help='whether use IFR.')
     parser.add_argument('--sequence_type',type=str,default="all",help='all sequence or longer only sequence(>5) or short only sequence(<=5)')
 
     args= parser.parse_args()
