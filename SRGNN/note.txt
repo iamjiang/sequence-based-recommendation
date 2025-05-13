@@ -1,0 +1,29 @@
+# PyTorch 2.7 + CUDA 11.8
+pip install torch==2.7.0+cu118 torchvision==0.18.0+cu118 torchaudio==2.7.0+cu118 \
+            --index-url https://download.pytorch.org/whl/cu118           # :contentReference[oaicite:0]{index=0}
+
+# DGL 2.2.1 + CUDA 11.8  (hosted on dgl.ai)
+pip install dgl-cu118==2.2.1 -f https://data.dgl.ai/wheels/cu118/repo.html   # :contentReference[oaicite:1]{index=1}
+
+
+# ---------- core ----------
+numpy>=2.2.5          # new NumPy 2.x ABI :contentReference[oaicite:2]{index=2}
+numexpr
+pandas>=2.2.3         # string‑dtype defaults changed   :contentReference[oaicite:3]{index=3}
+networkx>=3.4.2       # view semantics in 3.x          :contentReference[oaicite:4]{index=4}
+python-dateutil>=2.9
+# ---------- ML / stats ----------
+scikit-learn>=1.5
+scipy>=1.13
+numba>=0.59
+joblib
+tqdm
+# ---------- visualisation & utils ----------
+matplotlib>=3.9
+seaborn>=0.13
+jinja2>=3.1
+wandb>=0.17
+ipykernel             # Jupyter kernel
+requests
+
+
