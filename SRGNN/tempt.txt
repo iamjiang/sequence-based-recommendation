@@ -62,3 +62,9 @@ Traceback (most recent call last):
     from torchdata.datapipes.iter import IterDataPipe
 ModuleNotFoundError: No module named 'torchdata.datapipes'
 
+
+(.venv) [domino@run-6835c66438b2ca683eef7349-hk7wn SRGNN]$ which python
+/usr/bin/python
+(.venv) [domino@run-6835c66438b2ca683eef7349-hk7wn SRGNN]$ which pip
+~/.local/bin/pip
+
