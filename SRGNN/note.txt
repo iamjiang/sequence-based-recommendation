@@ -457,3 +457,27 @@ class SRGNN(nn.Module):
         logits = th.log(nn.functional.softmax(logits, dim=-1))
         return logits# , 0
 
+
+
+### save embedding table ###
+
+def dump_item_embeddings(model: SRGNN, path: str):
+    """
+    Save the item-embedding matrix as a CPU tensor *and* a .npy file.
+    """
+    emb = model.embedding.weight.detach().cpu()        # (n_items, d)
+    torch.save(emb, f"{path}.pt")
+    np.save(f"{path}.npy", emb.numpy())
+
+if test_recall > best_recall or test_mrr > best_mrr:
+    best_recall = test_recall
+    best_mrr    = test_mrr
+    torch.save(ckpt_dict, args.model_checkpoint)
+
+    # NEW: persist embedding table
+    dump_item_embeddings(model, Path(args.model_checkpoint).with_suffix(''))
+
+item_emb = torch.load("weblog_checkpoint.pt")   # shape: (n_items, d)
+# or
+item_emb = torch.from_numpy(np.load("weblog_checkpoint.npy"))
+
